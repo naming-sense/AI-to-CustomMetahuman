@@ -1,0 +1,11 @@
+{
+  "original_blend_sha256_unchanged": true,
+  "retained_face_vertex_order_exact": true,
+  "retained_uv_exact": true,
+  "retained_surface_error_m": 2.141341978089576e-08,
+  "max_weight_sum_error": 2.43524118559435e-06,
+  "unweighted_vertices": 0,
+  "max_influences": 12,
+  "unreal_omitted_morphs": [],
+  "unreal_omitted_nonzero_morphs": 0
+}

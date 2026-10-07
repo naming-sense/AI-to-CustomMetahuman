@@ -1,0 +1,11 @@
+{
+  "channels": 782,
+  "mesh_targets": {
+    "head_lod0_mesh": 778,
+    "eyeLeft_lod0_mesh": 2,
+    "eyeRight_lod0_mesh": 2
+  },
+  "mapping_count": 782,
+  "joints": 870,
+  "behavior_control_count": 269
+}

@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+*.blend
+*.blend1
+*.dna
+*.fbx
+*.uasset
+*.umap

@@ -1,0 +1,27 @@
+{
+  "stage": "initial_transfer_candidate",
+  "mapping": {
+    "Ettore_head_lod0_mesh": {
+      "mapped_vertices": 14877,
+      "median_distance_m": 0.0027150516398251057,
+      "max_distance_m": 0.02599058300256729
+    },
+    "Ettore_teeth_lod0_mesh": {
+      "mapped_vertices": 2003,
+      "median_distance_m": 0.0024374278727918863,
+      "max_distance_m": 0.010678771883249283
+    }
+  },
+  "surface_vertices": 16880,
+  "surface_faces": 17656,
+  "shape_keys": 778,
+  "weight_sum_error": 2.220446049250313e-16,
+  "dna_joints": 870,
+  "dna_channels": 782,
+  "dna_meshes": [
+    "head_lod0_mesh",
+    "eyeLeft_lod0_mesh",
+    "eyeRight_lod0_mesh"
+  ],
+  "deformation_review_passed": false
+}

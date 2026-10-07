@@ -1,0 +1,12 @@
+{
+  "mesh": "/Game/Characters/HeadP2MetaHuman/Rig/HeadP2/SK_HeadP2.SK_HeadP2",
+  "morphs": 782,
+  "materials": [
+    "/Game/Characters/HeadP2MetaHuman/Source/M_HeadP2_Eye.M_HeadP2_Eye",
+    "/Game/Characters/HeadP2MetaHuman/Source/M_HeadP2_Source.M_HeadP2_Source"
+  ],
+  "bones": 876,
+  "postprocess": "ABP_Face_PostProcess_C",
+  "sequence": "/Game/Characters/HeadP2MetaHuman/Rig/HeadP2/LS_HeadP2_FaceControls.LS_HeadP2_FaceControls",
+  "current_frame": 0
+}

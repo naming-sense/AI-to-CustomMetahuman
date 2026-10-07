@@ -1,0 +1,117 @@
+{
+  "verified_at": "2026-10-07T17:36:22+09:00",
+  "status": "functional_rig_verified_with_visual_polish_remaining",
+  "surface": {
+    "original_blend_sha256_unchanged": true,
+    "retained_face_vertex_order_exact": true,
+    "retained_uv_exact": true,
+    "retained_surface_error_m": 2.141341978089576e-08,
+    "max_weight_sum_error": 2.43524118559435e-06,
+    "unweighted_vertices": 0,
+    "max_influences": 12,
+    "unreal_omitted_morphs": [],
+    "unreal_omitted_nonzero_morphs": 0
+  },
+  "cross_engine": {
+    "max_joint_error_cm": 0.00010404041221620635,
+    "max_morph_weight_error": 0.0001220703125,
+    "poses": {
+      "0": {
+        "joint_errors_cm": {
+          "FACIAL_C_Jaw": 3.942316019982112e-05,
+          "FACIAL_L_EyelidUpperA2": 8.238887231176755e-05,
+          "FACIAL_L_LipCorner": 9.917005745607283e-05
+        },
+        "max_morph_weight_error": 0.0001220703125,
+        "active_morphs": 0,
+        "curves": {
+          "CTRL_expressions_jawOpen": 0.0,
+          "CTRL_expressions_eyeBlinkL": 0.0,
+          "CTRL_expressions_mouthCornerPullL": 0.0,
+          "head_lod0_mesh__p2_bs_0000": 0.0
+        }
+      },
+      "20": {
+        "joint_errors_cm": {
+          "FACIAL_C_Jaw": 3.358139126527484e-05,
+          "FACIAL_L_EyelidUpperA2": 8.238887231176755e-05,
+          "FACIAL_L_LipCorner": 0.00010115904024598172
+        },
+        "max_morph_weight_error": 0.0001220703125,
+        "active_morphs": 1,
+        "curves": {
+          "CTRL_expressions_jawOpen": 0.699999988079071,
+          "CTRL_expressions_eyeBlinkL": 0.0,
+          "CTRL_expressions_mouthCornerPullL": 0.0,
+          "head_lod0_mesh__p2_bs_0000": 0.0
+        }
+      },
+      "60": {
+        "joint_errors_cm": {
+          "FACIAL_C_Jaw": 3.942316019982112e-05,
+          "FACIAL_L_EyelidUpperA2": 5.4615773554871774e-05,
+          "FACIAL_L_LipCorner": 9.917005745607283e-05
+        },
+        "max_morph_weight_error": 0.0001220703125,
+        "active_morphs": 2,
+        "curves": {
+          "CTRL_expressions_jawOpen": 0.0,
+          "CTRL_expressions_eyeBlinkL": 1.0,
+          "CTRL_expressions_mouthCornerPullL": 0.0,
+          "head_lod0_mesh__p2_bs_0000": 0.0
+        }
+      },
+      "100": {
+        "joint_errors_cm": {
+          "FACIAL_C_Jaw": 3.942316019982112e-05,
+          "FACIAL_L_EyelidUpperA2": 8.238887231176755e-05,
+          "FACIAL_L_LipCorner": 0.00010404041221620635
+        },
+        "max_morph_weight_error": 0.0001220703125,
+        "active_morphs": 3,
+        "curves": {
+          "CTRL_expressions_jawOpen": 0.0,
+          "CTRL_expressions_eyeBlinkL": 0.0,
+          "CTRL_expressions_mouthCornerPullL": 0.699999988079071,
+          "head_lod0_mesh__p2_bs_0000": 0.0
+        }
+      }
+    }
+  },
+  "unreal": {
+    "mesh": "/Game/Characters/HeadP2MetaHuman/Rig/HeadP2/SK_HeadP2.SK_HeadP2",
+    "morphs": 782,
+    "materials": [
+      "/Game/Characters/HeadP2MetaHuman/Source/M_HeadP2_Eye.M_HeadP2_Eye",
+      "/Game/Characters/HeadP2MetaHuman/Source/M_HeadP2_Source.M_HeadP2_Source"
+    ],
+    "bones": 876,
+    "postprocess": "ABP_Face_PostProcess_C",
+    "sequence": "/Game/Characters/HeadP2MetaHuman/Rig/HeadP2/LS_HeadP2_FaceControls.LS_HeadP2_FaceControls",
+    "current_frame": 0
+  },
+  "known_limits": [
+    "Eye connectivity differs from original by explicit user approval; retained face/neck surface and UV unchanged.",
+    "Minor eyelid edge roughness/gaps and simple mouth interior need artistic polish.",
+    "Unreal FBX triangulates the runtime mesh; editable source quads remain in Blender.",
+    "No native C++ build performed."
+  ],
+  "files": {
+    "HeadP2_Rig.blend": {
+      "sha256": "ea63e19b25d70f1bfe857f0631fbb27ffe35f7549144a3c9d808d0884e006f77",
+      "bytes": 37850891
+    },
+    "HeadP2_Complete.dna": {
+      "sha256": "1776f88f2acac04dd21cd8e31f52bbfc40a5fc639496fea4a8aa9935490a1ca7",
+      "bytes": 40817540
+    },
+    "HeadP2_Complete_CM.fbx": {
+      "sha256": "40e29dde65ed6c5d25ab2cb2b300ecba92ef8a8add0489143e3896a6bef5e4d9",
+      "bytes": 52777244
+    },
+    "HeadP2_Eye_Albedo.png": {
+      "sha256": "195f95b23b579de3c0d246593ae94df204368c49d6ba669fc37738031a50ad8e",
+      "bytes": 169835
+    }
+  }
+}
