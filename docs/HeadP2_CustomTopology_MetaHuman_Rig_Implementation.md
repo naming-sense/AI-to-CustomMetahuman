@@ -1,27 +1,29 @@
-# 내 얼굴 메시를 유지하면서 메타휴먼 얼굴 리그 적용하기
+# 커스텀 얼굴 메시의 MetaHuman 리깅 구현
 
-이 문서는 직접 만든 얼굴 메시가 메타휴먼의 얼굴 컨트롤러를 따라 움직이도록 만든 과정을 설명한다. **얼굴 모양은 커스텀 메시 것을 유지하고, 얼굴을 움직이는 데 필요한 뼈·웨이트·표정 데이터는 기존 메타휴먼에서 가져온다.**
+커스텀 얼굴 메시의 표면·UV를 유지하면서 MetaHuman의 스키닝, 표정 보정, DNA와 RigLogic을 적용한 구현 기록입니다.
 
-이번에는 Tripo P2로 만든 얼굴과 **Ettore 메타휴먼**을 사용했다. 앞으로 Ettore처럼 데이터를 가져오는 모델을 **‘기준 메타휴먼’**, 데이터를 적용할 얼굴을 **‘커스텀 얼굴’**이라고 부른다.
+리거와 테크니컬 아티스트를 대상으로, Tripo P2 얼굴에 Ettore의 리깅 데이터를 전달한 과정과 Blender·Unreal 적용 절차를 설명한다. 스키닝 웨이트, Shape Key/Morph Target, 관절 계층에 대한 기본 지식을 전제로 한다.
+
+이 문서에서 **기준 메타휴먼**은 관절·웨이트·표정 데이터와 DNA 동작 정의를 제공하는 Ettore를, **커스텀 얼굴**은 이를 적용할 P2 메시를 뜻한다.
 
 | 작업 규모 | 내용 |
 |---|---|
-| 사용한 메시 | 원본 19,389면 → 눈 부분을 정리한 뒤 기존 면 17,656개 유지, 별도 안구 2개 추가 |
+| 사용한 메시 | 원본 19,389면 → 눈 영역 수정 후 원본 면 17,656개 유지, 별도 안구 2개 추가 |
 | 최종 DNA | 관절 870개, 표정 채널 782개 |
 
-얼굴·목의 남긴 표면과 UV는 보존했다. 눈 주변 연결을 수정하고 별도 안구를 쓰는 것은 사용자가 허용한 범위다.
+보존 대상은 남긴 얼굴·목 표면과 UV다. 눈 주변 연결 수정과 별도 안구 사용은 사용자 승인 범위에 포함한다.
 
-**따라 하는 순서:** 원본 복사 → 기준 메타휴먼 준비 → 눈과 위치 정리 → 웨이트·표정 전달 → DNA 저장 → Blender 확인 → Unreal 적용.
+**작업 순서:** 원본 보존 → 기준 메타휴먼 준비 → 좌표 정렬·눈 영역 수정 → 웨이트·표정 변위 전달 → 커스텀 DNA 생성 → Blender 평가 → Unreal 적용.
 
-본문은 이 작업의 방법을 설명하고, **13절에는 실제 스크립트를 실행할 순서**를 모았다. 결과 파일과 자세한 검증 수치는 맨 끝 부록에서 확인할 수 있다. 코드 속 파일명·함수명은 실제 실행에 필요하므로 원래 이름을 유지했다.
+13절에 재현용 스크립트 실행 순서를 정리했다. 산출물 경로와 상세 검증 기록은 부록에서 확인할 수 있다. 파일명·함수명은 실제 구현과 동일하게 유지한다.
 
-## 1. 필요한 프로그램과 기준 메타휴먼 준비
+## 1. 작업 환경과 기준 메타휴먼
 
 ### 1.1 설치와 프로젝트 준비
 
 - Blender 실행 파일: `C:/Program Files/Blender Foundation/Blender 5.2/blender.exe`
 - Character DNA 모듈: `bl_ext.api_portal_polyhammer_com.character_dna`
-- 이번 환경의 네이티브 연결: `windows/x64/py313`
+- 이번 환경의 네이티브 바인딩: `windows/x64/py313`
 - Unreal 프로젝트: `D:/Work/UnrealProjects/DeadHorizon/DeadHorizon.uproject`
 - MetaHuman/MetaHumanCharacter 플러그인 활성화, Python 에디터 스크립트 사용 가능 상태
 - 다음 플러그인 에셋이 실제로 로드되는지 확인:
@@ -39,30 +41,30 @@ C:/Users/YOUR_USER/Documents/Megascans Library/Downloaded/UAssets/
 
 실제 파일 경로는 위 두 줄을 합친 경로다. 다른 작업자는 사용할 수 있는 기준 메타휴먼 DNA를 준비하고 스크립트의 경로를 수정해야 한다. 프로젝트 재현 시 기준 메타휴먼 파일도 별도로 필요하다.
 
-Ettore에서 가져온 데이터는 다음과 같다.
+이 기준 메타휴먼에서 확인한 데이터:
 
 | 항목 | 수 |
 |---|---:|
 | 관절 | 870 |
-| RigLogic 입력값(raw controls) | 269 |
-| 표정 채널 | 782 |
-| 얼굴 표정 데이터 | 737 |
-| 치아·구강 표정 데이터 | 41 |
-| 안구 표정 데이터 | 각 2 |
-| 연골 메시의 표정 데이터 | 76; 다른 메시와 채널 공유 |
+| Raw controls | 269 |
+| Blendshape channels | 782 |
+| Head LOD0 targets | 737 |
+| Teeth LOD0 targets | 41 |
+| Eye LOD0 targets | 각 2 |
+| Cartilage targets | 76; 다른 메시와 채널 공유 |
 
-가장 자세한 모델 단계인 LOD0에서 표정 데이터 858개를 가져왔다. 최종 얼굴에는 얼굴 737개, 구강 41개, 안구 4개를 사용해 총 782개를 넣었다. 연골 메시처럼 같은 표정 채널을 함께 쓰는 메시도 있어, 메시별 표정 데이터 개수와 채널 개수는 항상 같지는 않다.
+LOD0에서 명시적으로 생성한 전체 target은 858개였다. 최종 출력은 얼굴과 두 안구만 포함하고, 구강 조각은 얼굴 메시 안에서 처리한다. 따라서 최종 target 합계는 `737 + 41 + 2 + 2 = 782`다. **채널 수와 여러 메시의 target 수 합계는 일반적으로 다를 수 있다.**
 
-엔진에 포함된 기본 얼굴(archetype)의 DNA 후보에는 표정 데이터가 없었다. 사용할 메타휴먼을 정할 때는 `getBlendShapeTargetCount()`로 실제 데이터가 있는지 검사한다.
+엔진에 포함된 archetype DNA 후보에서는 표정 target이 0개인 것을 확인했다. 기준 메타휴먼 이름만 확인하지 말고 `getBlendShapeTargetCount()`로 실제 데이터가 있는지 검사한다.
 
-## 2. 원본을 복사하고 변경 여부를 확인할 준비하기
+## 2. 원본 보존과 작업본 구성
 
-사용할 스크립트:
+관련 스크립트:
 
 - [headp2_preserve_prepare.py](../tools/headp2_preserve_prepare.py)
 - [mesh_fingerprint.py](../tools/mesh_fingerprint.py)
 
-원본을 별도 파일로 복사한 뒤 작업한다. 스크립트는 정점·면·UV 정보와 파일의 SHA256 값도 기록한다. SHA256은 파일이 바뀌었는지 비교하는 확인값이다. 저장한 작업본을 다시 열어 원본과 같은지 확인하며, 같은 이름의 작업본이 이미 있으면 덮어쓰지 않고 멈춘다.
+준비 스크립트는 원본 메시 수와 정점/면 수를 검사하고, 원본 파일 SHA256과 메시 지문을 저장한다. 작업본을 저장한 뒤 다시 열어 동일성을 확인한다. 기존 작업본이 있으면 덮어쓰기를 거부한다.
 
 눈 수정 후에는 다음 속성을 추가한다.
 
@@ -72,13 +74,13 @@ Ettore에서 가져온 데이터는 다음과 같다.
 | `p2_source_face` | FACE / INT | 작업본 면이 대응하는 원본 면 번호 |
 | `p2_source_component` | POINT / INT | 원본의 연결 컴포넌트 번호 |
 
-눈 부분을 지우면 남은 정점 번호도 달라질 수 있다. 그래서 각 정점과 면에 ‘원본의 몇 번이었는지’를 기록해 둔다. 나중에 이 번호로 원본과 비교하면 남긴 면이 그대로인지 확인할 수 있다. UV는 **각 면의 꼭짓점별 값(loop)**을 비교한다. 같은 정점도 텍스처의 경계 양쪽에서는 서로 다른 UV를 가질 수 있기 때문이다.
+면 단위로 보존 여부를 확인할 때는 작업본의 면 정점 번호를 `p2_source_vertex`로 역매핑한 다음 원본 면의 정점 순서와 비교한다. UV는 정점당 하나로 비교하지 않고 **face corner/loop 단위**로 비교한다. 하나의 정점이 UV seam 양쪽에서 서로 다른 UV를 가질 수 있기 때문이다.
 
-## 3. 얼굴에 붙은 눈을 정리하고 별도 안구 넣기
+## 3. 연결 컴포넌트 분석과 눈 영역 수정
 
-사용할 스크립트: [headp2_eye_repair.py](../tools/headp2_eye_repair.py)
+관련 스크립트: [headp2_eye_repair.py](../tools/headp2_eye_repair.py)
 
-먼저 에지로 이어진 정점들을 묶어 얼굴, 치아, 안구처럼 서로 떨어진 덩어리를 찾았다. 코드에서는 이 덩어리를 컴포넌트라고 부른다. 연결 관계를 묶는 union-find 알고리즘을 사용했고, 큰 덩어리부터 번호를 매겼다.
+원본의 에지 연결을 union-find로 분석하고, 연결 컴포넌트를 정점 수 내림차순으로 정렬했다.
 
 | ID | 정점 수 | 이번 모델에서의 역할 |
 |---|---:|---|
@@ -92,7 +94,7 @@ Ettore에서 가져온 데이터는 다음과 같다.
 
 컴포넌트 3 전체와, 주 표면에 붙어 있던 다른 쪽 안구의 지정 영역을 제거했다. 남긴 면의 좌표·정점 순서·재질 인덱스·smooth 설정·loop UV는 원본에서 복사했다.
 
-이번 모델의 영역 선택은 원본 좌표를 고정된 진단 화면 좌표로 바꿔 판정한다.
+눈 영역은 원본 좌표를 고정된 진단 화면 좌표로 투영해 판정했다.
 
 ```python
 pixel_x = 400 + center.y / 0.00115
@@ -100,9 +102,9 @@ pixel_y = 500 - center.z / 0.00115
 # center.x > .12인 면 중, 코드에 기록한 눈 윤곽 polygon 내부의 면 제거
 ```
 
-정확한 12개 윤곽점은 스크립트의 `contour` 배열에 기록돼 있다. 이 좌표와 컴포넌트 ID는 **이번 원본에만 적용되는 값**이다. 다른 모델에서는 실제 눈 경계를 다시 지정해야 한다.
+정확한 12개 윤곽점은 스크립트의 `contour` 배열에 기록돼 있다. 이 좌표와 컴포넌트 ID는 **이번 원본에만 적용되는 값**이다. 다른 모델에서는 눈 경계와 컴포넌트 ID를 다시 지정해야 한다.
 
-### 3.1 얼굴의 방향과 크기 맞추기
+### 3.1 좌표 정렬
 
 원본은 Blender에서 얼굴이 +X 방향을 향했다. 기준 메타휴먼 공간으로 맞추기 위해 다음 변환을 적용했다.
 
@@ -112,11 +114,11 @@ y_target = -0.25 · x_source - 0.03
 z_target =  0.25 · z_source + 1.594
 ```
 
-Blender 작업 공간에서는 미터 단위를 사용한다. 행렬로는 `Translation(0,-.03,1.594) × RotationZ(-90°) × Scale(.25)`다.
+Blender 작업 공간에서는 기준 메타휴먼을 미터 단위로 다룬다. 행렬로는 `Translation(0,-.03,1.594) × RotationZ(-90°) × Scale(.25)`다.
 
-눈을 정리할 때는 오브젝트 전체의 위치·회전·크기로 이 변환을 설정한다. 데이터를 옮기기 전에는 변환을 실제 정점 좌표에 적용하고 오브젝트 변환을 초기화한다. 얼굴과 목의 개별 정점을 따로 조각하거나 이동하지 않았다.
+눈 수정 단계에서는 오브젝트 행렬에 저장하고, 전달 단계에서 mesh data에 적용한 뒤 오브젝트 행렬을 Identity로 만든다. 이 일괄 변환을 제외한 얼굴·목 Basis의 개별 정점 이동은 수행하지 않았다.
 
-### 3.2 좌우 안구 넣기
+### 3.2 별도 안구
 
 기준 메타휴먼 안구 메시를 복사하고 중심 기준으로 1.35배 확대했다. 새 중심은 다음과 같다.
 
@@ -125,16 +127,16 @@ Left:  (+0.0325, -0.08525, 1.6175)
 Right: (-0.0325, -0.08525, 1.6175)
 ```
 
-좌우 명칭은 기준 메타휴먼 기준이다. 안구별 기존 표정 이동량도 1.35배 적용하고, `FACIAL_L_EyeParallel` / `FACIAL_R_EyeParallel` 및 자식 관절의 위치를 새 중심에 맞춰 함께 이동한다. 축 방향은 유지한다.
+좌우 명칭은 기준 메타휴먼 기준이다. 안구별 기존 shape delta도 1.35배 적용하고, `FACIAL_L_EyeParallel` / `FACIAL_R_EyeParallel` 및 자식 관절의 위치를 새 중심에 맞춰 함께 이동한다. 축 방향은 유지한다.
 
-## 4. 기준 메타휴먼의 얼굴·뼈·컨트롤러 가져오기
+## 4. 기준 메타휴먼 리그와 표정 데이터 임포트
 
-사용할 스크립트:
+관련 스크립트:
 
 - [headp2_ettore_import.py](../tools/headp2_ettore_import.py)
 - [headp2_donor_shapes.py](../tools/headp2_donor_shapes.py)
 
-LOD0만 가져오며 메시, 관절, 웨이트, 표정 데이터, Face Board를 요청한다. Body는 제외했다.
+LOD0만 가져오며 메시, 관절, 웨이트, Shape Key, Face Board를 요청한다. Body는 제외했다.
 
 ```python
 kwargs = {f'import_lod{i}': i == 0 for i in range(8)}
@@ -145,7 +147,7 @@ bpy.ops.character_dna.import_dna(
     include_body=False, **kwargs)
 ```
 
-이번 환경에서는 `import_shape_keys=True`를 설정해도 Blender에 표정 데이터가 생기지 않았다. DNA를 읽는 객체(reader)로 표정을 하나씩 읽어 직접 생성했다.
+이번 환경에서는 import 옵션에 `import_shape_keys=True`를 줘도 기대한 Shape Key가 생성되지 않았다. 따라서 DNA reader에서 target을 직접 순회하며 생성했다.
 
 ```python
 for mesh_index in reader.getMeshIndicesForLOD(0):
@@ -161,17 +163,17 @@ for mesh_index in reader.getMeshIndicesForLOD(0):
             prefix=mesh_name + '__', linear_modifier=.01)
 ```
 
-완료 후 `Ettore_Donor_Full.blend`를 저장한다. 기준 메타휴먼만 있는 상태에서 턱·눈 감기·미소가 관절과 표정 데이터를 동시에 움직이는지 먼저 확인한다. 전달 전에 기준 메타휴먼가 정상 작동해야 실패 원인을 구분할 수 있다.
+완료 후 `Ettore_Donor_Full.blend`를 저장한다. 기준 메타휴먼 자체에서 턱·눈 감기·미소가 관절과 Shape Key를 동시에 움직이는지 먼저 확인한다. 전달 전에 기준 메타휴먼이 정상 작동해야 실패 원인을 구분할 수 있다.
 
-## 5. 커스텀 얼굴이 뼈를 따라 움직이도록 웨이트 옮기기
+## 5. 표면 대응과 스키닝 웨이트 전달
 
-**웨이트는 각 정점이 어떤 뼈를 얼마나 따라갈지 정하는 비율**이다. 예를 들어 턱 뼈의 웨이트가 1이면 턱을 전부 따라가고, 0.3이면 여러 뼈의 영향 중 턱이 30%를 차지한다. 이 비율을 적용해 메시를 움직이는 작업이 스키닝이다.
+기준 메타휴먼과 커스텀 얼굴 사이에 정점 대응을 구성하고, 참조 삼각형의 barycentric 좌표로 웨이트를 보간한다. 얼굴·구강의 검색 영역을 분리하고 법선 조건을 추가해 인접 표면 간 오대응을 줄였다.
 
-사용할 스크립트: [headp2_transfer_rig_v2.py](../tools/headp2_transfer_rig_v2.py)
+관련 스크립트: [headp2_transfer_rig_v2.py](../tools/headp2_transfer_rig_v2.py)
 
-### 5.1 기준 메타휴먼의 눈과 입을 맞추기
+### 5.1 대응 검색을 위한 기준 메타휴먼 피팅
 
-두 얼굴을 겹쳐 놓아도 눈 크기와 입 위치가 다르면 엉뚱한 부분에서 데이터를 가져올 수 있다. 이를 줄이기 위해 **기준 메타휴먼의 눈·입 주변을 커스텀 얼굴에 가깝게 맞춘다.** 커스텀 얼굴의 기본 모양은 유지한다. 아래의 `W(p)`는 기준 메타휴먼의 정점 위치를 이렇게 조정하는 함수다.
+눈과 입의 비율 차이를 줄이기 위해 기준 메타휴먼 좌표에 부드러운 공간 변형 함수 `W(p)`를 정의했다. 커스텀 얼굴의 Basis를 유지하며, 기준 메타휴먼의 대응 검색 표면과 표정 변위 계산에 동일한 함수를 적용한다.
 
 눈 주변 각 측면 `s ∈ {-1,+1}`:
 
@@ -195,16 +197,16 @@ W(p)에 shift · falloff를 더함
 
 이 값들은 눈 크기·입 위치가 다른 이번 P2 얼굴에 맞춘 파라미터다. 다른 얼굴에서는 중립 표면과 진단 렌더를 비교해 다시 조정한다.
 
-### 5.2 얼굴과 입 안쪽을 나눠서 찾기
+### 5.2 영역별 참조 메시 선택
 
 - 컴포넌트 `[1,2,4,6]`: 기준 메타휴먼 `teeth_lod0_mesh`에서 대응 검색.
 - 나머지 컴포넌트: 기준 메타휴먼 `head_lod0_mesh`에서 대응 검색.
 
-얼굴 피부가 가까운 치아에서 데이터를 가져오는 일을 줄이기 위해 찾을 영역을 나눴다. 가까운 삼각형을 빠르게 찾는 공간 검색 구조(BVH)를 사용하며, 검색용 삼각형은 기준 메타휴먼의 `loop_triangles`에서 얻는다. 커스텀 얼굴의 면 구성은 유지된다.
+얼굴/구강의 가까운 면끼리 잘못 대응되는 범위를 줄이기 위해 검색 공간을 나눴다. 원본 면을 삼각형으로 교체할 필요는 없다. 기준 메타휴먼의 `loop_triangles`만 BVH 검색에 사용한다.
 
-### 5.3 가까우면서 같은 방향을 보는 표면 찾기
+### 5.3 거리·법선 기반 삼각형 선택
 
-커스텀 얼굴의 정점마다, 위치를 맞춘 기준 메타휴먼에서 가장 가까운 삼각형을 찾는다. 다만 위아래 입술처럼 서로 가까이 붙은 부분은 거리만으로 구분하기 어렵다. 그래서 **표면이 향하는 방향(법선)**도 비교한다. 가장 가까운 거리에서 3mm를 더한 범위 안의 후보 중 아래 점수가 가장 작은 삼각형을 고른다.
+커스텀 얼굴의 각 정점 `q`에서 `W(reference_basis)`의 최근접 삼각형을 찾는다. 최초 최근접 거리보다 3mm 더 넓은 범위에서 후보를 모은 후 다음 점수가 가장 작은 후보를 선택한다.
 
 ```text
 score = distance² + [0.004 · (1 - clamp(targetNormal · triangleNormal, -1, 1))]²
@@ -212,11 +214,9 @@ score = distance² + [0.004 · (1 - clamp(targetNormal · triangleNormal, -1, 1)
 
 거리만 사용하는 경우 입술 안쪽/바깥쪽, 위/아래 눈꺼풀이 섞일 수 있다. 법선 항은 반대쪽 표면을 선택할 가능성을 줄인다. 그럼에도 자동 대응의 오류가 남을 수 있으므로 눈꺼풀과 치아는 별도 보정했다.
 
-### 5.4 삼각형의 세 꼭짓점에서 웨이트 나눠 가져오기
+### 5.4 Barycentric 보간을 이용한 웨이트 전달
 
-선택한 삼각형의 어느 꼭짓점에 가까운지에 따라 가져올 비율을 정한다. 예를 들어 비율이 `(0.5, 0.3, 0.2)`면 세 꼭짓점의 웨이트를 각각 50%, 30%, 20%씩 섞는다. 이 비율을 **삼각형 내부 위치 비율(barycentric 좌표)**이라고 한다.
-
-선택한 삼각형의 꼭짓점 `a,b,c`와 삼각형 위에서 가장 가까운 점 `h`를 이용해 계산한다:
+선택한 삼각형의 정점 `a,b,c`, 삼각형 위 최근접점 `h`에 대해:
 
 ```text
 v0=b-a, v1=c-a, v2=h-a
@@ -227,9 +227,9 @@ den=d00·d11-d01²
 α=1-β-γ
 ```
 
-넓이가 거의 0인 삼각형은 `(1,0,0)`으로 처리한다. 비율은 0~1 범위로 제한(clamp)하고, 전체 합이 1이 되도록 다시 나눈다.
+퇴화 삼각형은 `(1,0,0)`으로 처리하고, 계산값은 `[0,1]`로 clamp한 뒤 합이 1이 되도록 정규화한다.
 
-커스텀 얼굴 정점에서 관절 `j`를 따라갈 비율:
+커스텀 얼굴 정점의 관절 `j` 웨이트:
 
 ```text
 w_target[j] = α·w_a[j] + β·w_b[j] + γ·w_c[j]
@@ -252,27 +252,27 @@ w_target[j] = α·w_a[j] + β·w_b[j] + γ·w_c[j]
 
 스크립트는 중앙값이 4cm를 넘으면 중단한다. 이 조건은 큰 정렬 오류 검출용이며, 개별 눈꺼풀·입술의 품질 통과를 보장하지 않는다.
 
-## 6. 표정에 따른 정점 움직임과 뼈 위치 옮기기
+## 6. Shape Key 전달과 중립 관절 정렬
 
-### 6.1 표정을 지었을 때 움직인 거리 옮기기
+웨이트 전달에서 구한 삼각형 대응을 표정 delta에도 사용한다. Blender에서는 Shape Key로 저장하고, FBX를 통해 Unreal Morph Target으로 가져온다.
 
-눈을 감을 때 각 정점이 기본 위치에서 얼마나 움직이는지 계산하고, 그 이동량을 커스텀 얼굴에 옮긴다. Blender에서는 이렇게 저장한 표정별 정점 위치를 **Shape Key**, Unreal에서는 **Morph Target**이라고 부른다.
+### 6.1 표정 변위 전달
 
-기준 메타휴먼의 기본 위치를 `p`, 표정을 지은 위치를 `pk`라 하면:
+기준 메타휴먼의 Basis를 `p`, 표정 target 좌표를 `pk`라 하면 전달용 변위는 다음과 같다.
 
 ```text
-기준 얼굴의 표정 이동량 = W(pk) - W(p)
-커스텀 얼굴의 표정 이동량 = α·Δa,k + β·Δb,k + γ·Δc,k
-커스텀 얼굴의 표정 위치 = 기본 위치 + 표정 이동량
+Δreference,k = W(pk) - W(p)
+Δtarget,k = α·Δa,k + β·Δb,k + γ·Δc,k
+TargetShapeKey[k] = TargetBasis + Δtarget,k
 ```
 
-이렇게 구한 이동량을 커스텀 얼굴의 기본 위치에 더해 표정을 만든다. 앞에서 눈과 입의 비율을 맞춘 결과도 이동량에 반영된다.
+피팅 함수가 표정 변위에도 반영되며 커스텀 얼굴의 중립 형태는 유지된다.
 
-얼굴 표정 737개와 구강 표정 41개를 커스텀 얼굴 메시 하나에 모았다. 각 표정에는 전체 정점 수만큼 좌표를 저장하고, 해당 영역의 정점에만 이동량을 적용한다.
+Head 737개와 Teeth 41개의 표정 타깃을 커스텀 얼굴 메시 하나에 통합했다. 각 타깃 배열은 커스텀 얼굴의 전체 정점 수와 같으며, 참조 메시별 대응 영역에만 delta를 기록한다.
 
-### 6.2 기본 자세의 뼈 위치 맞추기
+### 6.2 중립 관절 위치
 
-Blender의 Edit Mode에서 기준 메타휴먼 뼈의 시작점(head)을 `W(head)`로 옮기고, 같은 이동량(offset)을 끝점(tail)에도 더한다.
+기준 메타휴먼의 각 edit bone head를 `W(head)`로 이동시키고, 같은 offset을 tail에도 더한다.
 
 ```python
 offset = W(bone.head) - bone.head
@@ -280,28 +280,26 @@ bone.head += offset
 bone.tail += offset
 ```
 
-뼈의 양 끝에 같은 이동량을 더하면 방향과 길이는 유지된다. 이렇게 뼈 이름·부모 자식 관계·번호를 유지하면서 기본 위치를 얼굴에 맞춘다. 기준 메타휴먼의 기존 리그에서 얼굴 메시 데이터만 커스텀 얼굴로 교체해, Face Board와 리그의 연결도 유지한다.
+이동량을 같게 적용해 bone의 방향과 길이를 유지한다. 관절 이름·계층·인덱스 관계를 보존하며 중립 위치를 얼굴 비율에 맞춘다. 기준 메타휴먼 리그 인스턴스의 head mesh data를 커스텀 얼굴 데이터로 교체하므로 Face Board와 리그 연결 정보도 유지된다.
 
-## 7. 치아가 늘어나거나 눈꺼풀이 찌그러지는 문제 보정하기
+## 7. 치아 바인딩과 눈꺼풀 보정
 
-자동으로 옮긴 값은 치아와 눈꺼풀에서 특히 확인해야 한다. 가까운 곳에 서로 다른 표면이 붙어 있어 잘못된 값이 섞이기 쉽기 때문이다.
+### 7.1 치아 강체 바인딩
 
-### 7.1 치아는 위턱이나 아래턱 뼈 하나만 따라가게 하기
+관련 스크립트: [headp2_teeth_fix.py](../tools/headp2_teeth_fix.py)
 
-사용할 스크립트: [headp2_teeth_fix.py](../tools/headp2_teeth_fix.py)
-
-가까운 표면에서 가져온 웨이트를 그대로 쓰면 한 치아에 위턱과 아래턱의 영향이 섞일 수 있다. 입을 벌릴 때 치아가 늘어나는 이유다. 치아는 아래 표의 뼈 하나만 100% 따라가도록 바꿨다.
+최근접 전달만으로 치아를 바인딩하면 위·아래 턱 웨이트가 섞여 치아가 늘어날 수 있다. 치아 컴포넌트는 기존 웨이트를 제거하고 다음 관절에 1.0으로 바인딩했다.
 
 | 컴포넌트 | 관절 |
 |---|---|
 | 1 | `FACIAL_C_TeethLower` |
 | 2, 6 | `FACIAL_C_TeethUpper` |
 
-이 정점들은 모든 표정 데이터에서 기본 위치 좌표로 되돌려 표정 이동량을 0으로 만들었다. 치아 위치 변화는 관절이 담당한다. 컴포넌트 4의 구강 조각은 이 강체 처리에서 제외했다.
+이 정점들은 모든 Shape Key에서 Basis 좌표로 되돌려 표정 delta를 0으로 만들었다. 치아 위치 변화는 관절이 담당한다. 컴포넌트 4의 구강 조각은 이 강체 처리에서 제외했다.
 
-### 7.2 눈꺼풀의 움직임을 이웃 정점과 부드럽게 연결하기
+### 7.2 눈꺼풀 웨이트·delta 평활화
 
-사용할 스크립트: [headp2_eye_weights.py](../tools/headp2_eye_weights.py)
+관련 스크립트: [headp2_eye_weights.py](../tools/headp2_eye_weights.py)
 
 이번 모델의 처리 범위:
 
@@ -317,21 +315,23 @@ component ∈ {0,5}
 - 연결 에지를 이용해 이웃을 구성한다.
 - 분리된 눈꺼풀 띠(컴포넌트 5)는 얼굴 컴포넌트 0의 최근접 정점 3개를 추가 이웃으로 사용한다.
 - 웨이트는 `0.6·현재 + 0.4·이웃 평균`을 3회 적용한다.
-- 다시 상위 12개 영향만 유지하고 합이 1이 되도록 맞춘다.
-- 표정 이동량은 `0.65·현재 + 0.35·이웃 평균`을 2회 적용한다.
+- 다시 상위 12개 영향만 유지하고 정규화한다.
+- Shape delta는 `0.65·현재 + 0.35·이웃 평균`을 2회 적용한다.
 
-부드럽게 만드는 대상은 웨이트와 표정 이동량이다. 기본 위치 좌표나 UV 경계의 정점을 합치지 않는다. 눈꺼풀의 세밀한 접촉은 극단 포즈에서 별도 아트 보정이 필요할 수 있다.
+평활화 대상은 웨이트와 표정 delta다. Basis 좌표나 UV seam을 용접하지 않는다. 눈꺼풀의 세밀한 접촉은 극단 포즈에서 별도 아트 보정이 필요할 수 있다.
 
-## 8. 커스텀 얼굴에 맞는 DNA 저장하기
+## 8. 커스텀 DNA 구성과 표정 채널 매핑
 
-사용할 스크립트:
+기준 메타휴먼의 동작 정의를 유지하면서 커스텀 geometry, 스킨 웨이트, 표정 타깃과 중립 관절 위치를 기록한다. 채널 인덱스와 mesh/channel 매핑의 일치가 RigLogic 출력 연결의 핵심이다.
+
+관련 스크립트:
 
 - [headp2_finalize_blender.py](../tools/headp2_finalize_blender.py)
 - [headp2_complete_channels.py](../tools/headp2_complete_channels.py)
 
 ### 8.1 초기 커스텀 DNA 내보내기
 
-DNA에는 얼굴 뼈와 표정 데이터뿐 아니라, 컨트롤러 입력에 따라 이를 어떻게 움직일지도 들어 있다. 기준 메타휴먼의 동작 규칙을 유지하고, 앞에서 만든 커스텀 얼굴의 정점·웨이트·표정과 조정한 뼈 위치를 기록한다. 먼저 Character DNA의 `DNAExporter`로 저장한다.
+Character DNA의 `DNAExporter`를 사용한다.
 
 ```python
 instance.output.method = 'overwrite'
@@ -341,18 +341,18 @@ result = io.DNAExporter(
     textures=False, vertex_colors=False, seam_follower=None).run()
 ```
 
-커스텀 얼굴 메시, 얼굴 뼈, 좌우 안구를 내보낸다. 치아는 이미 커스텀 얼굴 안에 있으므로 기준 메타휴먼의 별도 치아 메시를 추가하지 않는다. 속눈썹과 눈을 덮는 보조 표면(eyeshell)도 이번 출력에서는 제외했다.
+출력 대상에는 커스텀 head mesh, head rig, 좌우 안구만 포함한다. 기준 메타휴먼의 별도 치아·속눈썹·eyeshell 등 보조 표면은 최종 출력에서 제외했다. 기준 메타휴먼의 동작 정의를 기반으로 커스텀 geometry와 중립 관절을 갖춘 DNA를 만든다.
 
-### 8.2 두 가지 실제 문제
+### 8.2 이름 제한과 타깃 누락 문제
 
-1. Blender 표정 데이터 이름이 길어지면 63자 제한에 걸려 이름이 잘리거나 `.001`이 붙었다. FBX 이름 변환까지 더해지면 DNA 채널 이름과 morph 이름이 어긋날 수 있다.
-2. 애드온의 덮어쓰기(overwrite) 기능이 기존 얼굴 표정 737개를 기준으로 처리해, 얼굴에 합친 구강 표정 41개를 모두 기록하지 못했다.
+1. Blender Shape Key 이름이 길어지면 63자 제한에 걸려 이름이 잘리거나 `.001`이 붙었다. FBX 이름 변환까지 더해지면 DNA 채널 이름과 morph 이름이 어긋날 수 있다.
+2. 애드온의 overwrite 경로가 원래 Head target 737개 기준으로 처리하면서, Head에 합친 Teeth target 41개를 완전히 기록하지 못했다.
 
-누락을 막기 위해 모든 표정 데이터를 다시 기록하고, **DNA가 계산한 표정 가중치가 커스텀 메시의 어떤 표정을 움직일지** 연결표도 다시 만들었다.
+해결은 최종 DNA의 target과 channel mapping을 명시적으로 다시 작성하는 것이었다.
 
-### 8.3 표정 번호는 유지하고 이름만 짧게 바꾸기
+### 8.3 채널 인덱스 유지와 짧은 이름
 
-기준 메타휴먼의 표정 채널 번호 `j`를 유지하면서 이름을 다음과 같이 바꾼다.
+원본 기준 메타휴먼의 채널 인덱스 `j`를 유지하면서 이름을 다음과 같이 바꾼다.
 
 ```text
 Channel: p2_bs_0000 ... p2_bs_0781
@@ -360,18 +360,18 @@ Head key: head_lod0_mesh__p2_bs_NNNN
 Eye key: eyeLeft_lod0_mesh__p2_bs_NNNN 등
 ```
 
-표정 채널은 ‘어떤 표정을 얼마나 적용할지’를 나타내는 항목이다. 이름을 줄여도 **채널 번호와 연결된 표정은 그대로 유지**해야 한다. 예를 들어 원래 10번 채널이 입 모양을 움직였다면, 이름을 바꾼 뒤에도 10번은 같은 입 모양에 연결돼야 한다. 원래 이름과 짧은 이름의 대응표는 `channel_alias_map.json`에 저장한다. 화면 컨트롤러와 RigLogic 입력 이름은 유지한다.
+원래 채널 이름과 단축명(alias)은 `channel_alias_map.json`에 저장한다. GUI/raw control 이름은 그대로 유지한다. 이 방식에서는 DNA Behavior가 출력하는 채널 **인덱스**와 Geometry mapping이 일치해야 한다.
 
-### 8.4 모든 표정을 빠짐없이 DNA에 기록하는 순서
+### 8.4 DNA writer 작업 순서
 
 1. 기존 커스텀 DNA 전체를 `writer.setFrom(..., DataLayer_All, UnknownLayerPolicy_Preserve, None)`으로 복사.
-2. 모든 채널 이름을 짧은 이름으로 변경.
-3. 기준 메타휴먼에서 얼굴과 구강의 표정 채널 번호를 원래 순서대로 읽어 합침.
+2. 모든 채널 이름을 짧은 alias로 변경.
+3. 원본 기준 메타휴먼에서 Head target 채널 순서와 Teeth target 채널 순서를 읽어 합침.
 4. `clearMeshBlendShapeChannelMappings()` 실행.
 5. 메시마다 `clearBlendShapeTargets(meshIndex)` 실행.
-6. 각 표정에서 정점 이동 거리가 `1e-9 m`보다 큰 정점만 선택.
-7. 채널 인덱스, 정점 인덱스, 이동량, 메시와 표정 채널 연결표를 명시적으로 기록.
-8. 저장 후 reader로 다시 열어 메시별 표정 개수를 확인.
+6. 각 Shape Key delta에서 길이가 `1e-9 m`보다 큰 정점만 선택.
+7. 채널 인덱스, 정점 인덱스, delta, mesh/channel mapping을 명시적으로 기록.
+8. 저장 후 reader로 다시 열어 메시별 target 수를 확인.
 
 핵심 writer API:
 
@@ -382,7 +382,7 @@ writer.setBlendShapeTargetDeltas(...)
 writer.setMeshBlendShapeChannelMapping(...)
 ```
 
-Blender 이동량을 DNA 좌표로 변환하는 식:
+Blender delta를 DNA 좌표로 변환하는 식:
 
 ```text
 DNA delta = 100 · (Blender Δx, Blender Δz, -Blender Δy)
@@ -390,9 +390,9 @@ DNA delta = 100 · (Blender Δx, Blender Δz, -Blender Δy)
 
 이 축 변환은 이번 Character DNA 파이프라인의 DNA 공간을 위한 것이다. 뒤의 Unreal 관절 비교에 사용하는 `(x,-y,z)`와 목적이 다르다.
 
-실행 전 표정 데이터 수와 기준 메타휴먼의 채널 순서가 맞는지 검사한다. 이 스크립트는 `HeadP2_Rig_Work.blend`의 생성 순서를 전제로 하므로 표정 데이터를 수동 재정렬한 작업본에는 그대로 사용하지 않는다.
+실행 전 Shape Key 수와 source 채널 순서가 맞는지 검사한다. 이 스크립트는 `HeadP2_Rig_Work.blend`의 생성 순서를 전제로 하므로 Shape Key를 수동 재정렬한 작업본에는 그대로 사용하지 않는다.
 
-## 9. 얼굴과 눈에 텍스처 연결하기
+## 9. 얼굴·안구 UV와 머티리얼
 
 ### 9.1 얼굴 PBR
 
@@ -411,7 +411,7 @@ Unreal의 `M_HeadP2_Source`는 BaseColor/Normal에 RGB, Roughness/Metallic에 R�
 
 ### 9.2 안구 전용 UV와 재질
 
-사용할 스크립트: [headp2_eye_material.py](../tools/headp2_eye_material.py)
+관련 스크립트: [headp2_eye_material.py](../tools/headp2_eye_material.py)
 
 초기에는 원본 분리 안구의 atlas UV를 최근접 삼각형으로 전달했지만, 새 안구에서 조각난 텍스처가 나타났다. 최종 파일에는 안구 전용 평면 UV와 절차적으로 만든 텍스처를 적용했다.
 
@@ -436,7 +436,7 @@ Blender 안구 UV와 함께 DNA의 `setVertexTextureCoordinates()` 및 vertex la
 
 기존 레벨 조명의 미술적 수정은 이 리깅 작업에서 완료한 항목에 포함하지 않는다.
 
-## 10. Blender에서 컨트롤러로 표정 움직이기
+## 10. Blender RigLogic 초기화와 컨트롤러 평가
 
 ### 10.1 사용자 설정
 
@@ -480,16 +480,16 @@ instance.auto_evaluate = True
 instance.evaluate(component='head')
 ```
 
-드라이버 오류에 `character_dna_native_solve_v1`가 나오면 먼저 애드온 활성화와 네이티브 연결 로딩 여부를 확인한다. 애드온 없이 열었을 때 해당 solver가 driver namespace에 없음을 재현했다. 스크립트 실행 차단 알림이 별도로 표시되는 경우에는 내용을 확인한 신뢰 가능한 작업 파일에 한해 Blender의 허용 절차를 따른다. 전역 보안 설정 해제를 필수 조건으로 두지 않는다.
+드라이버 오류에 `character_dna_native_solve_v1`가 나오면 먼저 애드온 활성화와 네이티브 바인딩 로딩 여부를 확인한다. 애드온 없이 열었을 때 해당 solver가 driver namespace에 없음을 재현했다. 스크립트 실행 차단 알림이 별도로 표시되는 경우에는 내용을 확인한 신뢰 가능한 작업 파일에 한해 Blender의 허용 절차를 따른다. 전역 보안 설정 해제를 필수 조건으로 두지 않는다.
 
-## 11. Unreal에 맞는 크기로 내보내고 DNA 연결하기
+## 11. FBX 단위 변환과 Unreal 임포트
 
-사용할 스크립트:
+관련 스크립트:
 
 - [headp2_export_centimeters.py](../tools/headp2_export_centimeters.py)
 - [headp2_ue_final_import.py](../tools/headp2_ue_final_import.py)
 
-### 11.1 미터와 센티미터를 맞춰 크기 오류 해결하기
+### 11.1 단위 문제와 최종 해결
 
 초기 FBX에서는 root scale 100 또는 매우 작은 메시가 나왔다. 단위 메타데이터 옵션만 바꾸는 것으로 해결되지 않았다.
 
@@ -562,7 +562,7 @@ unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
 
 기존 importer UI의 이전 선택값에 의존하면 다른 메시로 연결될 수 있다. `mesh.asset_user_data`에 `DNAAsset`이 붙었는지 확인한다. DNA가 별도 Content Browser 에셋으로 보이는지보다 **대상 SkeletalMesh의 userdata 연결**이 검증 기준이다.
 
-### 11.4 표정 계산용 애니메이션 블루프린트 연결하기
+### 11.4 PostProcess와 Skeleton
 
 ```python
 post = unreal.load_asset('/MetaHumanCharacter/Face/ABP_Face_PostProcess')
@@ -571,15 +571,13 @@ skeleton = mesh.get_editor_property('skeleton')
 skeleton.add_compatible_skeleton(post.get_editor_property('target_skeleton'))
 ```
 
-`ABP_Face_PostProcess`는 이 구성에서 DNA와 RigLogic을 이용한 얼굴 평가를 담당한다. 커스텀 메시에도 연결하고, 기준 메타휴먼의 스켈레톤을 호환 목록에 추가한다. 이 설정은 뼈 이름과 부모·자식 관계를 유지한 경우를 전제로 한다.
+호환 스켈레톤 등록은 원래 관절 이름·계층을 유지한 이 작업의 전제에서 사용한다. 임의의 스켈레톤에서 호환 목록만 추가한다고 DNA가 맞춰지지는 않는다.
 
 재질은 `headp2_ue_assign_materials.py`에서 슬롯 이름에 `Eye`가 포함되면 `M_HeadP2_Eye`, 그 외에는 `M_HeadP2_Source`를 지정한다. 구조체 배열을 수정한 뒤 `slots[j] = slot`으로 다시 넣고 전체 `materials` 속성을 저장한다. 저장 후 각 슬롯의 실제 material path를 다시 확인한다.
 
-## 12. Unreal에서 얼굴 컨트롤러 연결하기
+## 12. Unreal Control Rig와 시퀀서 구성
 
-Control Rig는 화면에서 잡고 움직일 얼굴 컨트롤러이고, 시퀀서는 그 움직임을 시간별로 저장하는 편집기다. 여기에 커스텀 얼굴을 연결하고 턱·눈·입꼬리의 테스트 키를 만든다.
-
-사용할 스크립트:
+관련 스크립트:
 
 - [headp2_ue_final_sequence.py](../tools/headp2_ue_final_sequence.py)
 - [headp2_ue_final_keys.py](../tools/headp2_ue_final_keys.py)
@@ -609,7 +607,7 @@ spawnable 액터는 일반 레벨 액터 열거에서 찾지 못할 수 있다. 
 
 컴포넌트의 일부 메시 속성이 `None`이라고 바로 참조 단절을 판정하지 않는다. 실제 `get_num_bones()`, `get_post_process_instance()`, bone transform, curve 값과 화면 변형을 함께 확인한다.
 
-## 13. 스크립트 실행 순서
+## 13. 재현용 스크립트 실행 순서
 
 ### 13.1 실행 전
 
@@ -636,8 +634,8 @@ $RigTools = 'D:\Work\UnrealProjects\DeadHorizon\SourceArt\Characters\HeadP2MetaH
 | 1 | `headp2_preserve_prepare.py` | 원본 → `Head_P2_PreserveTopology_Work.blend`, 지문 JSON |
 | 2 | `headp2_ettore_import.py` | Ettore DNA → `Ettore_Donor.blend` |
 | 3 | `headp2_donor_shapes.py` | 기준 메타휴먼 → `Ettore_Donor_Full.blend` |
-| 4 | `headp2_eye_repair.py` | 원본 작업본 + 표정이 포함된 기준 메타휴먼 → `Head_P2_EyeRepair_Work.blend` |
-| 5 | `headp2_transfer_rig_v2.py` | 표정이 포함된 기준 메타휴먼 + EyeRepair → `Head_P2_Rig_Candidate_v2.blend`, v2 DNA |
+| 4 | `headp2_eye_repair.py` | 원본 작업본 + 표정 타깃이 포함된 기준 메타휴먼 → `Head_P2_EyeRepair_Work.blend` |
+| 5 | `headp2_transfer_rig_v2.py` | 표정 타깃이 포함된 기준 메타휴먼 + EyeRepair → `Head_P2_Rig_Candidate_v2.blend`, v2 DNA |
 | 6 | `headp2_teeth_fix.py` | v2 → `Head_P2_Rig_Candidate_v3.blend`, v3 DNA |
 | 7 | `headp2_eye_weights.py` | v3 → `Head_P2_Rig_Candidate_v4.blend`, v4 DNA |
 | 8 | `headp2_finalize_blender.py` | v4 → `HeadP2_Rig_Work.blend`, `HeadP2_Rig.dna` |
@@ -683,39 +681,39 @@ exec(compile(open(r'D:/Work/UnrealProjects/DeadHorizon/SourceArt/Characters/Head
 
 네이티브 C++ 빌드는 이 절차에 포함하지 않는다. Blender 처리, Python 에디터 작업, FBX/DNA 임포트와 머티리얼 셰이더 처리는 실제로 수행했다.
 
-## 14. 움직이지 않거나 모양이 이상할 때
+## 14. 트러블슈팅
 
 | 증상 | 확인 / 실제 해결 |
 |---|---|
 | Blender에서 보드만 움직임 | Object Mode인지 확인. Face Board의 Pose Mode에서 개별 컨트롤 선택 |
 | 컨트롤은 움직이나 표정 고정 | Character DNA 활성화·환경설정 저장 → DNA 경로 → Auto Evaluate/Head → 뼈/Shape Key 평가 |
 | solver 이름 관련 드라이버 오류 | 애드온 활성화와 native binding 로딩 확인. 실행 차단 알림은 별도로 확인 |
-| import 성공인데 표정 데이터 없음 | DNA의 표정 개수와 Blender의 Shape Key 개수 비교. 표정 직접 생성 단계 실행 |
-| 치아가 늘어남 | 컴포넌트별 상/하악 강체 연결 및 치아 이동량 0 확인 |
-| 눈꺼풀이 반대쪽으로 끌림 | 법선 포함 대응, 영역 분리, 눈 주변 weight/이동량 부드럽게 보정 검토 |
-| 일부 morph가 작동하지 않음 | 63자 이름 제한, 짧은 이름, 채널 인덱스, 메시와 표정 채널 연결표, 778+2+2 표정 개수 확인 |
+| import 성공인데 Shape Key 없음 | DNA reader의 target 수와 Blender key 수 비교. `headp2_donor_shapes.py`로 타깃 생성 |
+| 치아가 늘어남 | 컴포넌트별 상/하악 강체 바인딩 및 치아 delta 0 확인 |
+| 눈꺼풀이 반대쪽으로 끌림 | 법선 포함 대응, 영역 분리, 눈 주변 weight/delta 평활화 검토 |
+| 일부 morph가 작동하지 않음 | 63자 이름 제한, alias, 채널 인덱스, mesh/channel mapping, 778+2+2 target 수 확인 |
 | 전체 머리 크기가 다름 | `_CM.fbx` 사용 여부, 실제 FBX source filename, root scale 1 확인 |
 | Unreal 관절은 움직이나 모프 없음 | import_morph_targets, DNA 채널 이름과 FBX morph 이름, PostProcess 확인 |
-| 다른 머리에 DNA가 붙음 | 새 DNAAssetImportUI에 표정을 적용할 SkeletalMesh 명시 |
+| 다른 머리에 DNA가 붙음 | 새 DNAAssetImportUI에 대상 SkeletalMesh 명시 |
 | 눈에 피부 조각이 보임 | 최종 안구 UV/전용 재질 적용 확인. 초기 atlas 전송본 사용 여부 확인 |
 | 얼굴이 검거나 주황빛 | BaseColor/UV를 Unlit로 확인한 후 레벨 조명·노출·PBR을 따로 확인 |
 | 재질을 바꿨는데 캡처가 같음 | 재질 설정과 촬영 사이에 렌더 프레임 갱신 필요 |
 | 샘플링 결과가 이전 포즈 | set_current_time 뒤 에디터 평가가 완료된 후 별도 호출에서 샘플링 |
 
-## 15. 다른 얼굴에 적용할 때 바꿔야 할 것
+## 15. 다른 커스텀 메시 적용 시 조정 항목
 
-다른 얼굴에도 같은 순서를 사용할 수 있다. 원본을 보존하고, 기준 메타휴먼에서 가까운 표면을 찾아 웨이트와 표정 이동량을 옮긴 뒤, DNA의 표정 번호를 맞춰 연결한다. 다만 얼굴의 크기와 눈·입 위치가 달라지므로 아래 값은 다시 조정해야 한다.
+그대로 재사용 가능한 원리는 원본 지문 관리, 원본 ID 추적, 삼각형 barycentric 전달, 웨이트 정규화, 표정 delta 전달, 채널 인덱스 유지, cm FBX와 교차 검증이다.
 
 다음 항목은 새 모델에서 다시 설정해야 한다.
 
 1. 원본 경로·정점 수·오브젝트 이름과 연결 컴포넌트 의미.
 2. 좌표계, 단위, 중립 얼굴의 위치와 크기.
-3. 눈/입 주변 기준 메타휴먼의 위치와 비율을 맞추는 함수의 중심·반경·이동량.
+3. 눈/입 주변 기준 메타휴먼 fitting 함수의 중심·반경·이동량.
 4. 제거 또는 분리할 안구 영역과 사용자 허용 범위.
 5. 눈 중심·크기·회전축과 눈꺼풀 대응.
 6. 치아·혀·구강의 영역별 전달 대상과 강체 여부.
 7. 웨이트 영향 수 제한과 프로젝트 타깃 플랫폼의 허용 조건.
-8. 기준 메타휴먼 DNA의 관절 수·채널 순서·메시별 표정 데이터 구성.
+8. 기준 메타휴먼 DNA의 관절 수·채널 순서·mesh target 구성.
 9. 머티리얼 슬롯·텍스처 연결·검수용 조명.
 10. 극단 표정, 좌우 비대칭, 시선, 여러 컨트롤의 조합 검수.
 
@@ -751,7 +749,7 @@ exec(compile(open(r'D:/Work/UnrealProjects/DeadHorizon/SourceArt/Characters/Head
 
 ## 부록 B. 검증 방법과 결과
 
-### B.1 표면과 스키닝
+### B.1 표면 보존과 스키닝 검증
 
 [headp2_delivery_audit.py](../tools/headp2_delivery_audit.py)를 사용한다. 이 스크립트는 Unreal에서 내보낸 `unreal_final_morph_names.json`도 입력으로 사용한다.
 
@@ -760,7 +758,7 @@ exec(compile(open(r'D:/Work/UnrealProjects/DeadHorizon/SourceArt/Characters/Head
 | 원본 파일 SHA256 동일 | True |
 | 남긴 면의 원본 정점 순서 동일 | True |
 | 남긴 loop UV 동일 | True |
-| 좌표 변환 후 기본 위치 최대 오차 | `2.141341978089576e-08 m` |
+| 좌표 변환 후 Basis 최대 오차 | `2.141341978089576e-08 m` |
 | 웨이트 합 최대 오차 | `2.43524118559435e-06` |
 | 미바인딩 정점 | 0 |
 | 정점당 최대 영향 관절 | 12 |
