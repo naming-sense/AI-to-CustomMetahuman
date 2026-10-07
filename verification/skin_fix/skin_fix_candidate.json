@@ -1,0 +1,9 @@
+{
+  "lip_vertices": 2170,
+  "tongue_vertices": 143,
+  "tongue_reference_triangles": 258,
+  "tongue_mapping_max_distance_m": 0.042063433676958084,
+  "skin_only_change": true,
+  "shape_keys_unchanged": true,
+  "outside_region_weights_unchanged": true
+}

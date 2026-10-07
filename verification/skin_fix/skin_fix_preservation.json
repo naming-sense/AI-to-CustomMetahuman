@@ -1,0 +1,13 @@
+{
+  "basis": true,
+  "faces": true,
+  "uv": true,
+  "shapes": true,
+  "changed_vertices": 2313,
+  "changed_components": [
+    0,
+    4
+  ],
+  "max_weight_sum_error": 2.43524118559435e-06,
+  "unweighted": 0
+}

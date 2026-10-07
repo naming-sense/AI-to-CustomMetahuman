@@ -1,0 +1,124 @@
+{
+  "verified_at": "2026-10-07T22:01:00+09:00",
+  "status": "skin_weights_corrected_with_mouth_interior_polish_remaining",
+  "preservation": {
+    "basis": true,
+    "faces": true,
+    "uv": true,
+    "shapes": true,
+    "changed_vertices": 2313,
+    "changed_components": [
+      0,
+      4
+    ],
+    "max_weight_sum_error": 2.43524118559435e-06,
+    "unweighted": 0
+  },
+  "blender_pose_checks": {
+    "poses": {
+      "neutral": {
+        "max_diagnostic_edge_growth_mm": 0.0,
+        "first_edge_mm": 0.6905313366930171,
+        "tongue_center": [
+          -0.001124861503326842,
+          -0.07057767733931541,
+          1.5503363225843523
+        ],
+        "finite": true
+      },
+      "jaw": {
+        "max_diagnostic_edge_growth_mm": 2.4931450997116302,
+        "first_edge_mm": 3.040118997409975,
+        "tongue_center": [
+          -0.000787053659032799,
+          -0.06510387771352605,
+          1.536502412982754
+        ],
+        "finite": true
+      },
+      "jaw_full": {
+        "max_diagnostic_edge_growth_mm": 3.8159329307177368,
+        "first_edge_mm": 4.044196294124738,
+        "tongue_center": [
+          -0.0005598933761817292,
+          -0.06188477993897208,
+          1.5313998635832247
+        ],
+        "finite": true
+      },
+      "smile": {
+        "max_diagnostic_edge_growth_mm": 0.5816434456464952,
+        "first_edge_mm": 0.5961776677695155,
+        "tongue_center": [
+          -0.001124861503326842,
+          -0.07057767733931541,
+          1.5503363225843523
+        ],
+        "finite": true
+      },
+      "jaw_smile": {
+        "max_diagnostic_edge_growth_mm": 2.5199976383090923,
+        "first_edge_mm": 2.878376565649133,
+        "tongue_center": [
+          -0.000787053659032799,
+          -0.06510387771352605,
+          1.536502412982754
+        ],
+        "finite": true
+      },
+      "tongue": {
+        "max_diagnostic_edge_growth_mm": 2.4931450997116302,
+        "first_edge_mm": 3.040118997409975,
+        "tongue_center": [
+          -0.0008494823248495211,
+          -0.06086009512883383,
+          1.5373399832865575
+        ],
+        "finite": true
+      },
+      "tongue_out": {
+        "max_diagnostic_edge_growth_mm": 2.4931450997116302,
+        "first_edge_mm": 3.040118997409975,
+        "tongue_center": [
+          -0.0005970023001765611,
+          -0.08003668109332765,
+          1.5333272076986886
+        ],
+        "finite": true
+      }
+    },
+    "tongue_nontongue_max": 0,
+    "pass": true
+  },
+  "representative_edge_jaw_0_7_mm": {
+    "before": 15.421466,
+    "after": 3.040118997409975
+  },
+  "unreal": {
+    "rechecked_after_editor_restart": true,
+    "poses": [
+      0,
+      20,
+      100
+    ],
+    "tongue_out_curve": 0.699999988079071,
+    "saved_state": {
+      "mesh": "/Game/Characters/HeadP2MetaHuman/Rig/HeadP2/SK_HeadP2.SK_HeadP2",
+      "morphs": 782,
+      "materials": [
+        "/Game/Characters/HeadP2MetaHuman/Source/M_HeadP2_Eye.M_HeadP2_Eye",
+        "/Game/Characters/HeadP2MetaHuman/Source/M_HeadP2_Source.M_HeadP2_Source"
+      ],
+      "bones": 876,
+      "postprocess": "ABP_Face_PostProcess_C",
+      "sequence": "/Game/Characters/HeadP2MetaHuman/Rig/HeadP2/LS_HeadP2_FaceControls.LS_HeadP2_FaceControls",
+      "current_frame": 0
+    },
+    "temporary_materials_restored": true,
+    "tongue_test_value_reset": true
+  },
+  "limitations": [
+    "Extreme tongue extrusion still intersects the original mouth/lip geometry. Skinning correction does not resolve mouth interior shape or collision."
+  ],
+  "backup": "/mnt/d/Work/UnrealProjects/DeadHorizon/SourceArt/Characters/HeadP2MetaHuman/PreserveTopology/Backups/BeforeLipTongueFix_20261007_213033"
+}
